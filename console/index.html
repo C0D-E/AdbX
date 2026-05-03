@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AdbX Console</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>" />
+</head>
+<body>
+  <!-- ─── HEADER ────────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header__brand">
+      <span class="header__logo">⚡</span>
+      <span class="header__title">AdbX Console</span>
+    </div>
+    <nav class="header__nav">
+      <button class="nav-btn active" data-tab="devices">Devices</button>
+      <button class="nav-btn" data-tab="terminal">Terminal</button>
+      <button class="nav-btn" data-tab="files">Files</button>
+      <button class="nav-btn" data-tab="settings">Settings</button>
+      <button class="nav-btn" data-tab="advanced">Advanced</button>
+    </nav>
+    <div class="header__profile">
+      <span id="connection-status" class="status-dot status-dot--disconnected" title="Disconnected from AdbX Node"></span>
+      <button class="profile-btn" id="profile-btn">
+        <span class="profile-avatar">👤</span>
+        <span class="profile-name">User</span>
+        <span class="profile-chevron">▾</span>
+      </button>
+      <div class="profile-dropdown" id="profile-dropdown" hidden>
+        <div class="profile-dropdown__header">
+          <strong>AdbX Node</strong>
+          <small id="node-url-display">ws://127.0.0.1:7272</small>
+        </div>
+        <hr />
+        <button onclick="showNodeSettings()">⚙ Node Settings</button>
+        <button onclick="app.reconnect()">🔄 Reconnect</button>
+        <hr />
+        <small class="version-text" id="footer-version">v1.0.0</small>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─── MAIN LAYOUT ───────────────────────────────────────────────────── -->
+  <div class="layout">
+    <!-- SIDEBAR: Device list -->
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <span>Devices</span>
+        <button class="icon-btn" id="refresh-devices-btn" title="Refresh devices">↺</button>
+      </div>
+      <ul class="device-list" id="device-list">
+        <li class="device-list__empty">No devices connected</li>
+      </ul>
+      <div class="sidebar__footer">
+        <small id="sidebar-node-status">Node: disconnected</small>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="main-content">
+
+      <!-- ── Tab: Devices / Live View ─────────────────────────────────── -->
+      <section class="tab-panel active" id="tab-devices">
+        <div class="panel-header">
+          <h2 id="selected-device-title">Select a device</h2>
+          <div class="panel-actions" id="device-actions" hidden>
+            <button class="btn btn--primary" id="start-view-btn">▶ Live View</button>
+            <button class="btn btn--secondary" id="screenshot-btn">📷 Screenshot</button>
+            <button class="btn btn--danger" id="reboot-btn">↺ Reboot</button>
+          </div>
+        </div>
+
+        <div class="device-info-grid" id="device-info-grid" hidden>
+          <div class="info-card"><span class="info-label">Model</span><span class="info-value" id="di-model">—</span></div>
+          <div class="info-card"><span class="info-label">Manufacturer</span><span class="info-value" id="di-mfr">—</span></div>
+          <div class="info-card"><span class="info-label">Android</span><span class="info-value" id="di-android">—</span></div>
+          <div class="info-card"><span class="info-label">SDK</span><span class="info-value" id="di-sdk">—</span></div>
+          <div class="info-card"><span class="info-label">Resolution</span><span class="info-value" id="di-resolution">—</span></div>
+          <div class="info-card"><span class="info-label">RAM</span><span class="info-value" id="di-ram">—</span></div>
+          <div class="info-card"><span class="info-label">Serial</span><span class="info-value" id="di-serial">—</span></div>
+          <div class="info-card"><span class="info-label">Brand</span><span class="info-value" id="di-brand">—</span></div>
+        </div>
+
+        <!-- Live device view -->
+        <div class="device-view-container" id="device-view-container" hidden>
+          <div class="device-frame">
+            <canvas id="device-canvas" class="device-canvas"></canvas>
+            <div class="device-overlay" id="device-overlay">
+              <span>Live view starting…</span>
+            </div>
+          </div>
+          <div class="view-controls">
+            <button class="btn btn--secondary" id="stop-view-btn">⏹ Stop</button>
+            <label>FPS: <select id="fps-select">
+              <option value="15">15</option>
+              <option value="30" selected>30</option>
+              <option value="60">60</option>
+            </select></label>
+            <label>Quality: <select id="quality-select">
+              <option value="480">480p</option>
+              <option value="720" selected>720p</option>
+              <option value="1080">1080p</option>
+            </select></label>
+          </div>
+        </div>
+
+        <div class="empty-state" id="device-empty-state">
+          <div class="empty-icon">📱</div>
+          <h3>Connect an Android device</h3>
+          <p>Connect your device via USB and make sure USB debugging is enabled in Developer Options.</p>
+          <code>adb devices</code>
+        </div>
+      </section>
+
+      <!-- ── Tab: Terminal ─────────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-terminal">
+        <div class="panel-header">
+          <h2>Command Terminal</h2>
+          <div class="panel-actions">
+            <button class="btn btn--secondary" id="clear-terminal-btn">🗑 Clear</button>
+          </div>
+        </div>
+        <div class="terminal-container">
+          <div class="terminal-output" id="terminal-output" aria-live="polite" aria-label="Terminal output"></div>
+          <div class="terminal-input-row">
+            <span class="terminal-prompt" id="terminal-prompt">$ </span>
+            <span id="terminal-input-hint" class="sr-only">Enter an ADB shell command and press Enter or click Run. Use ↑/↓ arrow keys to navigate command history.</span>
+            <input
+              type="text"
+              class="terminal-input"
+              id="terminal-input"
+              placeholder="adb shell command…"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Terminal input"
+              aria-describedby="terminal-input-hint"
+            />
+            <button class="btn btn--primary" id="run-cmd-btn">Run</button>
+          </div>
+        </div>
+        <div class="terminal-quick-cmds">
+          <span class="label">Quick:</span>
+          <button class="quick-cmd" data-cmd="getprop ro.product.model">Model</button>
+          <button class="quick-cmd" data-cmd="pm list packages -3">Packages</button>
+          <button class="quick-cmd" data-cmd="dumpsys battery">Battery</button>
+          <button class="quick-cmd" data-cmd="df -h">Storage</button>
+          <button class="quick-cmd" data-cmd="top -n 1 -b | head -20">CPU</button>
+          <button class="quick-cmd" data-cmd="netstat">Network</button>
+          <button class="quick-cmd" data-cmd="logcat -d -t 50">Logcat</button>
+        </div>
+      </section>
+
+      <!-- ── Tab: Files ────────────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-files">
+        <div class="panel-header">
+          <h2>File Transfer</h2>
+          <div class="panel-actions">
+            <button class="btn btn--primary" id="upload-btn">⬆ Upload</button>
+            <input type="file" id="upload-input" hidden multiple />
+          </div>
+        </div>
+        <div class="file-browser">
+          <div class="breadcrumb" id="breadcrumb">
+            <button class="breadcrumb-item active" data-path="/sdcard">/sdcard</button>
+          </div>
+          <table class="file-table">
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Size</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="file-table-body">
+              <tr><td colspan="4" class="table-empty">Select a device first</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="transfer-progress" id="transfer-progress" hidden>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+          <span id="progress-label">Transferring…</span>
+        </div>
+      </section>
+
+      <!-- ── Tab: Settings ─────────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-settings">
+        <div class="panel-header"><h2>Device Settings</h2></div>
+
+        <div class="settings-sections">
+          <!-- Gaming -->
+          <details class="settings-group" open>
+            <summary>🎮 Gaming</summary>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>Gaming Profile</label>
+                <select id="gaming-profile">
+                  <option value="low">Low-end</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High-end</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Resolution Scaling</label>
+                <select id="gaming-resolution">
+                  <option value="480">480p</option>
+                  <option value="720" selected>720p</option>
+                  <option value="1080">1080p</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Frame Rate</label>
+                <select id="gaming-fps">
+                  <option value="30" selected>30 fps</option>
+                  <option value="60">60 fps</option>
+                  <option value="90">90 fps</option>
+                  <option value="120">120 fps</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Graphics Quality</label>
+                <select id="gaming-quality">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-gaming-btn">Apply Gaming Profile</button>
+          </details>
+
+          <!-- Performance -->
+          <details class="settings-group">
+            <summary>⚡ Performance</summary>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>CPU Governor</label>
+                <select id="cpu-governor">
+                  <option value="performance">Performance</option>
+                  <option value="ondemand" selected>On-demand</option>
+                  <option value="powersave">Power Save</option>
+                  <option value="schedutil">Schedutil</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Animator Duration Scale</label>
+                <select id="animator-scale">
+                  <option value="0">Off</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="1" selected>1x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2">2x</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Transition Animation Scale</label>
+                <select id="transition-scale">
+                  <option value="0">Off</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="1" selected>1x</option>
+                  <option value="2">2x</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Window Animation Scale</label>
+                <select id="window-scale">
+                  <option value="0">Off</option>
+                  <option value="0.5">0.5x</option>
+                  <option value="1" selected>1x</option>
+                  <option value="2">2x</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-perf-btn">Apply Performance Settings</button>
+          </details>
+
+          <!-- Security -->
+          <details class="settings-group">
+            <summary>🔒 Security</summary>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>Stay Awake (USB)</label>
+                <select id="stay-awake">
+                  <option value="0">Off</option>
+                  <option value="1">On</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Screen Timeout (ms)</label>
+                <select id="screen-timeout">
+                  <option value="15000">15s</option>
+                  <option value="30000" selected>30s</option>
+                  <option value="60000">1 min</option>
+                  <option value="300000">5 min</option>
+                  <option value="-1">Never</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>USB Debugging</label>
+                <select id="usb-debug">
+                  <option value="1" selected>Enabled</option>
+                  <option value="0">Disabled</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-security-btn">Apply Security Settings</button>
+          </details>
+
+          <!-- Display -->
+          <details class="settings-group">
+            <summary>🖥 Display</summary>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>Screen Resolution</label>
+                <select id="display-resolution">
+                  <option value="reset">Default</option>
+                  <option value="480x854">480p</option>
+                  <option value="720x1280">720p</option>
+                  <option value="1080x1920">1080p</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Screen Density (DPI)</label>
+                <select id="display-density">
+                  <option value="reset">Default</option>
+                  <option value="160">160 dpi</option>
+                  <option value="240">240 dpi</option>
+                  <option value="320">320 dpi</option>
+                  <option value="420">420 dpi</option>
+                  <option value="480">480 dpi</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Brightness</label>
+                <input type="range" id="display-brightness" min="0" max="255" value="128" />
+              </div>
+              <div class="setting-item">
+                <label>Auto-rotate</label>
+                <select id="display-rotate">
+                  <option value="1">On</option>
+                  <option value="0">Off</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-display-btn">Apply Display Settings</button>
+          </details>
+
+          <!-- Audio -->
+          <details class="settings-group">
+            <summary>🔊 Audio</summary>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>Media Volume (0–15)</label>
+                <input type="range" id="audio-media" min="0" max="15" value="10" />
+              </div>
+              <div class="setting-item">
+                <label>Ring Volume (0–15)</label>
+                <input type="range" id="audio-ring" min="0" max="15" value="10" />
+              </div>
+              <div class="setting-item">
+                <label>Notification Volume (0–15)</label>
+                <input type="range" id="audio-notif" min="0" max="15" value="10" />
+              </div>
+              <div class="setting-item">
+                <label>System Volume (0–7)</label>
+                <input type="range" id="audio-system" min="0" max="7" value="5" />
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-audio-btn">Apply Audio Settings</button>
+          </details>
+        </div>
+      </section>
+
+      <!-- ── Tab: Advanced ─────────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-advanced">
+        <div class="panel-header">
+          <h2>Advanced</h2>
+        </div>
+        <div class="advanced-layout">
+          <div class="advanced-group">
+            <h3>Device Information</h3>
+            <pre class="props-output" id="props-output">Select a device to view properties</pre>
+            <button class="btn btn--secondary" id="load-props-btn">Load Properties</button>
+          </div>
+          <div class="advanced-group">
+            <h3>Network Settings</h3>
+            <div class="settings-grid">
+              <div class="setting-item">
+                <label>Wi-Fi</label>
+                <select id="wifi-state">
+                  <option value="enable">Enable</option>
+                  <option value="disable">Disable</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Mobile Data</label>
+                <select id="data-state">
+                  <option value="enable">Enable</option>
+                  <option value="disable">Disable</option>
+                </select>
+              </div>
+              <div class="setting-item">
+                <label>Airplane Mode</label>
+                <select id="airplane-mode">
+                  <option value="0">Off</option>
+                  <option value="1">On</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary" id="apply-network-btn">Apply Network Settings</button>
+          </div>
+          <div class="advanced-group">
+            <h3>Custom ADB Command</h3>
+            <textarea
+              id="custom-adb-input"
+              class="custom-adb-textarea"
+              rows="4"
+              placeholder="shell dumpsys activity&#10;shell pm list packages&#10;push /path/to/file /sdcard/"
+            ></textarea>
+            <button class="btn btn--primary" id="run-custom-btn">Run</button>
+            <pre class="props-output" id="custom-output"></pre>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ─── FOOTER ────────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="footer__left">
+      <span id="footer-ver">AdbX Console v1.0.0</span>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/C0D-E/AdbX" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <div class="footer__center">
+      <span id="footer-selected-device">No device selected</span>
+    </div>
+    <div class="footer__right">
+      <a href="https://github.com/C0D-E/AdbX/issues" target="_blank" rel="noopener">🐛 Feedback</a>
+    </div>
+  </footer>
+
+  <!-- ─── NODE SETTINGS MODAL ───────────────────────────────────────────── -->
+  <div class="modal-overlay" id="node-settings-modal" hidden>
+    <div class="modal">
+      <div class="modal__header">
+        <h3>AdbX Node Connection</h3>
+        <button class="modal__close" onclick="closeModal('node-settings-modal')">✕</button>
+      </div>
+      <div class="modal__body">
+        <label>Node URL
+          <input type="text" id="node-url-input" value="ws://127.0.0.1:7272/ws" />
+        </label>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" onclick="saveNodeSettings()">Save &amp; Connect</button>
+        <button class="btn btn--secondary" onclick="closeModal('node-settings-modal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── TOAST NOTIFICATIONS ──────────────────────────────────────────── -->
+  <div class="toast-container" id="toast-container" aria-live="assertive"></div>
+
+  <script src="js/app.js"></script>
+  <script src="js/deviceView.js"></script>
+  <script src="js/terminal.js"></script>
+  <script src="js/fileTransfer.js"></script>
+  <script src="js/settings.js"></script>
+</body>
+</html>

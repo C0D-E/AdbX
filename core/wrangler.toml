@@ -1,0 +1,29 @@
+name = "adbx-core"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespaces – create these with `wrangler kv:namespace create`
+# then paste the resulting IDs below.
+# [[kv_namespaces]]
+# binding = "SESSIONS_KV"
+# id = "<YOUR_SESSIONS_KV_ID>"
+
+# [[kv_namespaces]]
+# binding = "NODES_KV"
+# id = "<YOUR_NODES_KV_ID>"
+
+# [[kv_namespaces]]
+# binding = "USER_KV"
+# id = "<YOUR_USER_KV_ID>"
+
+[vars]
+# Override in Cloudflare dashboard for production
+JWT_SECRET = "dev-secret-change-me-in-production"
+ALLOWED_ORIGIN = "https://c0d-e.github.io,http://localhost:3000"
+
+[env.production]
+name = "adbx-core-prod"
+
+[env.production.vars]
+ALLOWED_ORIGIN = "https://c0d-e.github.io"
