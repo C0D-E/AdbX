@@ -1,0 +1,17 @@
+{
+  "name": "adbx-core",
+  "version": "1.0.0",
+  "description": "AdbX Core - Cloudflare Worker cloud layer",
+  "main": "src/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest"
+  },
+  "keywords": ["cloudflare", "worker", "adb", "bridge"],
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^1.3.0",
+    "wrangler": "^3.0.0"
+  }
+}
